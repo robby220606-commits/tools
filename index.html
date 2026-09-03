@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>工具箱 · 计时 · 计数 · 换算</title>
+    <style>
+        /* 全局重置与排版 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+            -webkit-tap-highlight-color: transparent !important;
+            outline: none !important;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            padding: 34px 20px 48px;
+            overflow-y: auto;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* 环境光斑 + 暗角，让渐变更有层次 */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background:
+                radial-gradient(circle at 18% 12%, rgba(255,255,255,0.22), transparent 42%),
+                radial-gradient(circle at 85% 84%, rgba(255,255,255,0.14), transparent 45%),
+                radial-gradient(circle at 50% 50%, transparent 45%, rgba(0,0,0,0.12) 100%);
+        }
+
+        /* ---------- 顶部标题 ---------- */
+        .app-title {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 24px;
+            z-index: 10;
+            animation: cardIn 0.5s cubic-bezier(0.22,0.9,0.3,1) both;
+        }
+        .app-title h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            letter-spacing: 8px;
+            text-indent: 8px;
+            text-shadow: 0 4px 14px rgba(0,0,0,0.22);
+        }
+        .app-title p {
+            font-size: 0.76rem;
+            letter-spacing: 4px;
+            text-indent: 4px;
+            opacity: 0.82;
+            margin-top: 7px;
+        }
+
+        /* ---------- 双列网格 ---------- */
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 22px;
+            width: 100%;
+            max-width: 800px;
+            z-index: 10;
+        }
+        .clock-card { grid-column: 1 / -1; }
+
+        @media (max-width: 760px) {
+            .app-grid { grid-template-columns: 1fr; max-width: 430px; }
+        }
+
+        .container-card {
+            background: linear-gradient(150deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.10));
+            backdrop-filter: blur(22px) saturate(150%);
+            -webkit-backdrop-filter: blur(22px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 26px;
+            padding: 24px 22px 26px;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+            z-index: 10;
+            animation: cardIn 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .container-card:nth-child(1) { animation-delay: 0.04s; }
+        .container-card:nth-child(2) { animation-delay: 0.10s; }
+        .container-card:nth-child(3) { animation-delay: 0.16s; }
+        .container-card:nth-child(4) { animation-delay: 0.22s; }
+        .container-card:nth-child(5) { animation-delay: 0.28s; }
+
+        /* 入场动画结束后接管，交给 hover 微交互 */
+        .container-card.anim-done {
+            animation: none;
+            transition: transform 0.28s ease, box-shadow 0.28s ease;
+        }
+        @media (hover: hover) {
+            .container-card.anim-done:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 26px 54px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            }
+        }
+
+        h2 {
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 0.88rem;
+            margin-bottom: 18px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+        h2::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, rgba(255,255,255,0.4), rgba(255,255,255,0));
+        }
+
+        /* 时钟区域 */
+        .clock-card { padding: 24px 30px 26px; }
+        .clock-inner {
+            display: block;
+            width: 100%;
+        }
+        .datetime-display {
+            text-align: center;
+            color: #ffffff;
+        }
+        #current-date {
+            font-size: 1rem;
+            font-weight: 400;
+            opacity: 0.88;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+        #lunar-line {
+            margin-top: 12px;
+            font-size: 0.98rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            opacity: 0.96;
+        }
+        #term-line {
+            margin-top: 7px;
+            font-size: 0.74rem;
+            letter-spacing: 0.6px;
+            opacity: 0.78;
+            line-height: 1.6;
+        }
+        #term-line b { font-weight: 600; opacity: 1; }
+
+        #current-time {
+            font-size: 3.2rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 秒表区域 */
+        #timer {
+            font-size: 3.1rem;
+            font-weight: 200;
+            color: #ffffff;
+            margin: 6px 0 18px 0;
+            letter-spacing: 1px;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .btn-round {
+            width: 78px;
+            height: 78px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none !important;
+            -webkit-appearance: none;
+            cursor: pointer;
+            background: linear-gradient(150deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.14));
+            color: #ffffff;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            transition: all 0.2s ease;
+            touch-action: none;
+        }
+        #startBtn {
+            color: #1fb98c;
+            background: linear-gradient(150deg, #ffffff, #edf2fa);
+            box-shadow: 0 12px 26px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+        #startBtn.running { color: #ff3b30; }
+
+        #recordList {
+            width: 100%;
+            max-height: 120px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.22);
+            padding: 0;
+            margin-top: 10px;
+            list-style: none;
+        }
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 9px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.85);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 独立计数器 */
+        .number-wrapper {
+            position: relative;
+            width: 100%;
+            min-width: 200px;
+            height: 130px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .num {
+            position: absolute;
+            font-size: 4.8rem;
+            font-weight: 800;
+            color: #ffffff;
+            text-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+            animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards;
+        }
+
+        .old-num {
+            animation: slideOut 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards;
+        }
+
+        @keyframes slideIn {
+            0% { transform: translateY(50px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(0.8); opacity: 0; }
+        }
+
+        .counter-controls {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            margin-top: 25px;
+        }
+
+        .btn-rect {
+            padding: 16px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            border: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none !important;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            touch-action: none;
+        }
+
+        #plusBtn {
+            background: linear-gradient(135deg, #ffffff, #ffeaf3);
+            color: #e73c7e;
+            flex-grow: 1;
+            box-shadow: 0 12px 26px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+        #minusBtn, #resetCounterBtn {
+            background: linear-gradient(150deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.12));
+            color: rgba(255, 255, 255, 0.92);
+            width: 65px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+        }
+
+        .btn-rect:active, .btn-round:active {
+            transform: scale(0.96);
+        }
+
+        /* 唯一的点击反馈：按钮内高雅的涟漪水波纹 */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background-color: rgba(231, 60, 126, 0.2);
+            transform: scale(0);
+            animation: ripple-anim 0.4s linear;
+            pointer-events: none;
+        }
+        @keyframes ripple-anim {
+            to { transform: scale(4); opacity: 0; }
+        }
+
+        /* ---------- 单位/汇率换算模块 ---------- */
+        .convert-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            align-items: stretch;
+        }
+
+        .convert-input,
+        .convert-select {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+            background-image: linear-gradient(150deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.10));
+            background-color: transparent;
+            background-repeat: no-repeat;
+            background-position: center;
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            border-radius: 14px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.07);
+            color: #ffffff;
+            font-size: 1.02rem;
+            padding: 13px 14px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .convert-input { flex: 1; }
+        .convert-input::placeholder { color: rgba(255, 255, 255, 0.62); }
+        .convert-input[readonly] {
+            background-image: linear-gradient(150deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.16));
+            font-weight: 600;
+        }
+        .convert-select {
+            flex: 1;
+            cursor: pointer;
+            background-image:
+                url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 8L1 3h10z'/%3E%3C/svg%3E"),
+                linear-gradient(150deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.10));
+            background-repeat: no-repeat, no-repeat;
+            background-position: right 12px center, center;
+            padding-right: 32px;
+        }
+        .convert-select option { color: #333; background: #fff; }
+        .convert-input:focus,
+        .convert-select:focus {
+            border-color: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), inset 0 1px 3px rgba(0,0,0,0.07);
+        }
+
+        .swap-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            background: linear-gradient(150deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.12));
+            color: #ffffff;
+            font-size: 1.15rem;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            margin: 11px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .swap-btn:active { transform: rotate(180deg) scale(0.94); }
+
+        .convert-note {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.75);
+            margin-top: 10px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="app-title">
+        <h1>工具箱</h1>
+        <p>计时 · 计数 · 换算</p>
+    </header>
+
+    <div class="app-grid">
+
+        <div class="container-card clock-card">
+            <div class="clock-inner">
+                <div class="datetime-display">
+                    <div id="current-date">0000年00月00日 星期一</div>
+                    <div id="current-time">00:00:00</div>
+                    <div id="lunar-line">农历……</div>
+                    <div id="term-line">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container-card">
+            <h2>⏱️ StopWatch</h2>
+            <div id="timer">00:00.00</div>
+            <div class="btn-container">
+                <button id="countBtn" class="btn-round">计圈</button>
+                <button id="startBtn" class="btn-round">开始</button>
+            </div>
+            <ul id="recordList"></ul>
+        </div>
+
+        <div class="container-card">
+            <h2>🔢 Counter</h2>
+            <div class="number-wrapper">
+                <span class="num current-num">0</span>
+            </div>
+            <div class="counter-controls">
+                <button id="minusBtn" class="btn-rect">-1</button>
+                <button id="plusBtn" class="btn-rect">+1 计数</button>
+                <button id="resetCounterBtn" class="btn-rect">清零</button>
+            </div>
+        </div>
+
+        <div class="container-card">
+            <h2>📐 单位换算</h2>
+            <select id="unitCategory" class="convert-select" style="width:100%; margin-bottom: 14px;"></select>
+            <div class="convert-row">
+                <input id="unitFromVal" class="convert-input" type="number" inputmode="decimal" placeholder="输入数值">
+                <select id="unitFrom" class="convert-select"></select>
+            </div>
+            <button id="unitSwap" class="swap-btn">⇅</button>
+            <div class="convert-row">
+                <input id="unitToVal" class="convert-input" readonly placeholder="换算结果">
+                <select id="unitTo" class="convert-select"></select>
+            </div>
+        </div>
+
+        <div class="container-card">
+            <h2>💱 汇率换算</h2>
+            <div class="convert-row">
+                <input id="rateFromVal" class="convert-input" type="number" inputmode="decimal" placeholder="输入金额">
+                <select id="rateFrom" class="convert-select"></select>
+            </div>
+            <button id="rateSwap" class="swap-btn">⇅</button>
+            <div class="convert-row">
+                <input id="rateToVal" class="convert-input" readonly placeholder="换算结果">
+                <select id="rateTo" class="convert-select"></select>
+            </div>
+            <div id="rateNote" class="convert-note">汇率加载中…</div>
+        </div>
+
+    </div>
+
+    <script>
+        // ---------------- 实时日期时间逻辑 ----------------
+        function updateDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            const weeks = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const week = weeks[now.getDay()];
+            document.getElementById('current-date').textContent = `${year}年${month}月${date}日 ${week}`;
+
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+
+            updateLunar();
+        }
+
+        // ---------------- 农历 / 节气 ----------------
+        // ===== 农历数据表（由权威农历库导出校对，覆盖 1900-2100） =====
+        const LUNAR_INFO = [
+            0x4bd8,0x4ae0,0xa570,0x54d5,0xd260,0xd950,0x6554,0x156a0,0x9ad0,0x55d2,0x4ae0,0xa5b6,0xa4d0,0xd250,
+            0xd255,0x1b540,0xd6a0,0xada2,0x95b0,0x4977,0x14970,0xa4b0,0xb4b5,0x6a50,0x6d40,0xab54,0x12b60,0x9570,
+            0x52f2,0x4970,0x6566,0xd4a0,0xea50,0x6a95,0x15ad0,0x2b60,0x86e3,0x192e0,0xc8d7,0x1c950,0xd4a0,0xd8a6,
+            0x1b550,0x56a0,0xa5b4,0x125d0,0x92d0,0xd2b2,0xa950,0xb557,0x6ca0,0xb550,0x5355,0x14da0,0xa5b0,0x4573,
+            0x152b0,0xa9a8,0xe950,0x6aa0,0xaea6,0xab50,0x4b60,0xaae4,0xa570,0x5260,0xf263,0xd950,0x5b57,0x56a0,
+            0x96d0,0x4dd5,0x4ad0,0xa4d0,0xd4d4,0xd250,0xd558,0xb540,0xb6a0,0x95a6,0x195b0,0x49b0,0xa974,0xa4b0,
+            0xb27a,0x6a50,0x6d40,0xaf46,0xab60,0x9570,0x4af5,0x4970,0x64b0,0x74a3,0xea50,0x6b58,0x5ac0,0xab60,
+            0x96d5,0x92e0,0xc960,0xd954,0xd4a0,0xda50,0x7552,0x56a0,0xabb7,0x25d0,0x92d0,0xcab5,0xa950,0xb4a0,
+            0xbaa4,0xad50,0x55d9,0x4ba0,0xa5b0,0x5176,0x152b0,0xa930,0x7954,0x6aa0,0xad50,0x5b52,0x4b60,0xa6e6,
+            0xa4e0,0xd260,0xea65,0xd530,0x5aa0,0x76a3,0x96d0,0x4afb,0x4ad0,0xa4d0,0xd0b6,0x1d250,0xd520,0xdd45,
+            0xb5a0,0x56d0,0x55b2,0x49b0,0xa577,0xa4b0,0xaa50,0xb255,0x16d20,0xada0,0x4b63,0x19370,0x49f8,0x4970,
+            0x64b0,0x68a6,0x1ea50,0x6b20,0xa6c4,0x1aae0,0x92e0,0xd2e3,0xc960,0xd557,0xd4a0,0xda50,0x5d55,0x56a0,
+            0xa6d0,0x55d4,0x52d0,0xa9b8,0xa950,0xb4a0,0xb6a6,0xad50,0x55a0,0xaba4,0xa5b0,0x52b0,0xb273,0x6930,
+            0x7337,0x6aa0,0xad50,0x4b55,0x14b60,0xa570,0x54e4,0xd160,0xe968,0xd520,0xdaa0,0x6aa6,0x156d0,0x4ae0,
+            0xa9d4,0xa2d0,0xd150,0xf252,0xd520,0x0,
+        ];
+
+        // 节气时刻：每年 24 个节气，各用 4 位 base36 记录"距当年 1 月 1 日 0 点的分钟数"
+        const TERM_STR =
+            '05nf0m0k12f31iwp1zhx2g832x343e3r3v974cjg4tx25bdf5sum6abo6rqq792v7qas87dw8obp95479lrra2azaiqvaz4h05x50ma412or1j681zrm2ghn2xcw3edd3vj24ct44u705bn35t4j6alb6s0m79cj7qkm87nk8oli95dy9m1ma2ktaj0sazec06730mjz12yq1jg3201j2grg2xmp3en43vsq4d2t4ugj5bwr5tdy6aux6s9y79m57qty87x78oux95nn9mb5a2unajahazob06gv0mu1138j1jq420ba2h1e2xwd3ewy3w2d4dcl4uq75c6g5tno6b4m6sjr79vt7r3u886v8p4t95xb9ml1a349ajkbazxw06qp0n3l13ic1jzo20l32hay2y663f6i3wc64dm44v005cg35txj6bed6stn7a5o7rdp88gs8pen96779musa3e3aju1b07p05wf0m9f12o31j5k1zqx2ggx2xc23ecj3vi24cs74u5t5bm35t376ak96rz879bg7qj987mh8ok795cv9m0da2jsaizmazdf06610mj712xr1jfe200o2gqs2xlv3emf3vrw4d204ufo5bvt5td36atw6s9379l17qt487w28ou295mi9maaa2thaj9lazn506fz0msu137m1joy20af2h082xvi3evt3w1h4dbf4up85c5a5tmn6b3h6sin79ur7r2q885w8p3q95wf9mk0a33gajjbazx306pp0n2s13hb1jyt20k12ha32y533f5n3wb24dla4uyv5cf75twc6bde6sse7a4k7rcg88fm8pde96609mtma3cyajsvb06l05v90m8a12mw1j4e1zpo2gfo2xat3eb93vgu' +
+            '4cqw4u4p5bkt5t276aj06rya79a77qia87l88oj795bm9lzda2ikaiymazc706510mhy12wr1je41zzk2gpe2xkm3ekx3vqj4d0i4ue85buc5tbl6asi6s7l79jr7qrm87uu8osl95lb9m8ta2saaj84azlz06ek0mrr136a1jnw20922gz62xu43eun3w004da64unp5c3z5tl46b246sh879tc7r1d884h8p2e95uy9mina31vajhvazvh06o70n1513ft1jx720ik2h8h2y3o3f403w9n4djl4uxf5cdg5tuw6bbp6sr17a317rb588e78pc6964q9msea3boajrmb05805tx0m6v12li1j2w1zo82ge52x9b3e9q3vfa4cpd4u315bj95t0e6ahf6rwf798o7qgi87js8ohj95aa9lxta2hbaix5azay063i0mgn12v51jcp1zxv2gny2xix3ejh3vow4cz14ucn5bsv5ta36aqy6s6579i57qq887t98ora95jt9m7na2qwaj71azkm06dg0mqb13511jmb207o2gxf2xsl3ess3vye4d8a4um45c255tjj6b0e6sfn79rq7qzt882z8p0w95tl9mh9a30pajgnazuf06n30n0513ep1jw520hd2h7a2y293f2o3w814di54uvp5cc05tt56ba96spa7a1k7r9g88cq8paj96399mqua3a9ajq6b03y05sl0m5p12k91j1s1zn02gd12x813e8h3vdx4cny4u1n5bhq5sz26afv6rv679757qfb87ic8oge958v9lwoa2fwaiw0az9l062g0mfc12u51jbg1zww2gmp2xhx3ei53vnq4cxl4uba5brb5t8k6apf6s4j79gp7qon87rx' +
+            '8ops95ik9m66a2pqaj5mazjh06c30mp8133r1jlb206h2gwj2xrg3ery3vxa4d7f4ukw5c155ti86az86sea79qg7qyf881n8ozl95s99mfza2zdajfdazt306ls0mys13de1jus20g32h5z2y123f1f3w6z4dgx4uuq5car5ts66b8y6soa7a097r8e88bg8p9h96209mpsa393ajp6b02s05rl0m4i12j81j0j1zlx2gbq2x6w3e783vcs4cms4u0h5bgn5sxu6aeu6rtv79637qdx87h78oey957q9lv9a2esaiunaz8j06140meb12su1jag1zvl2glo2xgm3eh43vmg4cwm4ua65bqe5t7l6aoj6s3p79fs7qnu87qx8oox95hg9m59a2ojaj4mazi806b20mny132o1jjz205c2gv42xq93eqh3vw24d5x4ujq5bzq5th66ay06sdc79pf7qxl880r8oyr95re9mf4a2yhajegazs506kt0mxs13cd1jtr20f02h4w2xzx3f0a3w5p4dfs4utd5c9n5tqt6b7x6sn079zb7r7988am8p8g96189mota38aajo4b01x05qh0m3k12i01izi1zkn2gao2x5m3e633vbh4clk4tz85bfd5swo6adk6rsv794x7qd487g78oeb956v9luqa2dzaiu4az7o060i0mdc12s21j9a1zun2gkd2xfi3efo3vl84cv24u8t5bot5t656an06s2879ed7qmf87pq8ono95gi9m47a2nraj3qazhl06a80mnb131u1jja204e2gub2xp63epj3vut4d4v4uic5bym5tfp6aws6sbv79o57qw587zg8oxf95q69mdwa2xdajdeazr606jv0mww13bg' +
+            '1jsv20e12h3w2xyu3ez43w4j4deg4us55c865tpk6b6e6slr79xt7r6188958p7995zu9mnpa370ajn5b00r05pm0m2i12h81iyi1zjv2g9m2x4r3e4y3vag4ckb4txy5be05sv76ac56rr8793h7qbf87es8ocn955h9lt3a2coaiskaz6g05z20mc812qr1j8b1ztg2gjh2xed3eet3vk24cu54u7m5bns5t4v6alt6s0w79d27ql487ob8omd95f19m2wa2maaj2eazg3068v0mlt130g1jhs20322gsu2xnw3eo33vtl4d3f4uh55bx45teh6av96sak79mm7qut87xz8ow295or9mcla2w0ajc4azpt06il0mvi13a51jrg20cp2h2h2xxi3exs3w374dd64uqr5c6y5to46b556sk779wi7r4e887r8p5l95yf9mm1a35majliazze05nz0m1412fl1ix41zi72g872x323e3i3v8t4ciw4twh5bcn5stw6aat6rq179247qa987dd8obf95409lrua2b5airbaz4x05xs0mao12pf1j6p1zs22ghr2xcv3ed03vii4csa4u615blz5t3c6ak66rzf79bk7qjo87mx8okw95do9m1ea2kwaj0wazep067e0mkg12z01jgf201m2grh2xme3emq3vs04d204ufh5bvp5tct6atw6s8z79lb7qtc87wq8oun95nh9mb5a2unajakazod06gy0mu0138h1jpx20b12h0x2xvu3ew73w1k4dbj4up65c595tmm6b3h6siv79uy7r38886d8p4k95x69ml2a34dajkiazy205mv0lzo12ed1ivk1zgw2g6l2x1p3e1v3v7e4ch94tuy5baz' +
+            '5ss96a966rod790l7q8n87c08o9y952u9lqja2a4aiq2az3x05wj0m9m12o21j5j1zql2ggj2xbc3ebq3vgz4cr24u4i5bkr5t1v6aix6ry079a97qic87ln8ojp95ch9m0ca2juaizxazdp066f0mje12xy1jf9200e2gq42xl13el73vql4d0e4ue35bu35tbi6asc6s7r79jv7qs687vd8otk95m99ma7a2tmaj9taznh06gb0mt8137v1jp320ab2gzz2xuy3ev23w0g4dab4unw5c405tl86b2a6shf79ts7r1t88598p3695w39mjqa33cajj9azx605lr0lyx12dd1iuw1zfy2g5w2x0o3e123v694cga4ttr5b9x5sr36a826rn978zg7q7n87aw8o92951r9lpoa291aip7az2w05vq0m8n12nc1j4m1zpx2gfm2xan3ear3vg64cpw4u3k5bjg5t0r6ahj6rwu798y7qh687kg8oil95bf9lzba2iuaiyyazcr065i0mii12x41jeg1zzm2gpe2xkb3ekj3vpt4czq4ud65btc5tae6arg6s6i79iu7qqv87ub8osa95l89m8ya2slaj8kazmh06f30ms7136m1jo320942gz02xtt3eu53vzf4d9e4umy5c325tkc6b176sgi79sm7r0v88418p2895uv9miua327ajifazw205ky0lxt12cj1itq1zf12g4p2wzr3dzu3v5c4cf44tst5b8s5sq26a6x6rm578yb7q6e879p8o7p950j9loaa27vainvaz1r05ug0m7k12m31j3k1zoo2gek2x9e3e9q3vex4cox4u2c5bik5szm6agp6rvr79827qg387jg8ohg95aa9ly3' +
+            'a2hmaixoazbh06460mh712vq1jd31zy72go02xiw3ej33voe4cy94ubv5bru5t976aq26s5g79hk7qpx87t48ord95k19m80a2rdaj7kazl606e00mqu135i1jmo207x2gxk2xsl3eso3vy44d7x4ulk5c1m5tiv6azv6sf279re7qzg882x8p0w95tt9mhia314ajh1azux05jh0lwk12ay1isf1zdf2g3c2wy33dyh3v3o4cdq4tr65b7e5soj6a5k6rkq78x07q56878h8o6n94ze9lnba26saimxaz0m05te0m6b12kw1j251znb2gcz2x7w3e7z3vdc4cn34u0r5bgo5sy16aet6ru7796b7qel87hv8og3958w9lwva2geaiwlazad06360mg412up1jbx1zx22gmp2xhk3eho3vmx4cwr4ua85bqc5t7h6aok6s3p79g47qo687ro8opo95io9m6ea2q3aj62azk006cl0mpq13441jlk206j2gwd2xr33erc3vwi4d6f4ujw5c005th86ay76sdi79pq7qy1881b8ozk95sa9mg9a2znajfvaztj05ie0lv9129x1ir51zce2g202wx03dx13v2g4cc44tps5b5n5smy6a3s6rj278v97q3g876t8o4y94xu9lloa25aailcayz705rx0m4z12ji1j0w1zm02gbt2x6n3e6v3vc24clz4tzc5bfi5swj6adk6rsn794z7qd187gj8oel957k9lvea2f2aiv4az90061n0mep12t51jai1zvi2glb2xg23eg93vlh4cvc4u8v5bov5t656an06s2e79ei7qmv87q48oog95h79m59a2ooaj4yazim06bi0moc132z1jk4205c2guw' +
+            '2xpv3epv3vv94d504uin5byn5tfx6awv6sc479oe7qwi87zz8oxz95qy9mepa2ydajeeazsb05gy0lu2128i1ipx1zay2g0s2wvi3dvt3v0y4cay4toc5b4k5slo6a2q6rhw78u77q2c875q8o3t94wo9lkka243aik7ayy005qs0m3s12id1izo1zks2gah2x5c3e5e3vap4ckf4ty05bdw5sv96ac26rrh793l7qby87f88odj956b9luba2dtaiu1az7r060m0mdi12s61j9d1zuk2gk62xf33ef43vke4cu64u7o5bnp5t4v6alx6s1479dj7qln87p88on995ga9m42a2nqaj3pazhm06a60mna131n1jj220402gtu2xoj3eot3vty4d3x4uhc5bxi5teo6avp6saz79na7qvl87yy8ox895q19me2a2xiajdpazrd05g60lt1127m1ios1z9y2fzk2wui3duj3uzx4c9m4tna5b365ski6a1b6rgo78su7q15874i8o2q94vn9ljma237aijdayx705py0m2x12hh1iyq1zjt2g9h2x4a3e4e3v9l4cjg4twv5bd05su36ab56rq9792o7qar87eb8ocd955f9ltaa2d1ait4az7305zq0mct12r71j8k1zth2gj72xdu3ee03vj34csy4u6e5bmg5t3p6akn6s0179c97qkn87nz8omc95f49m38a2mpaj30azgp069m0mmh13141ji9203f2gsx2xnu3enr3vt34d2p4ugb5bw85tdk6aug6s9s79m37qub87xs8ovx95ow9mcra2weajchazqd05f10ls4126m1inz1z902fys2wti3dtq3uyt4c8q4tm25b275sj96a0c6rfg' +
+            '78ru7pzz873h8o1n94ul9liia225aii9ayw405ou0m1v12gd1ixp1zir2g8g2x383e3b3v8i4ci84tvp5bbl5ssu6a9n6rp079157q9k87cv8ob895429ls7a2bqais1az5s05yo0mbj12q61j7b1zsh2gi02xcw3ecv3vi54crt4u5c5bla5t2h6ajf6rym79b07qj587mq8okt95dv9m1pa2lgaj1hazfg06820ml612zj1jgx201t2grm2xm83emh3vrj4d1h4uev5bv15tc56at76s8f79kq7qsz87we8oum95nh9mbha2v0ajb8azoz05ds0lqq125a1imi1z7m2fx82ws23ds23uxd4c714tkn5b0j5shv69yo6re278q77pyj871u8o0494sz9lgza20jaigrayuj05nd0m0b12ex1iw51zha2g6w2x1p3e1q3v6x4cgp4tu45ba65sra6a8c6rni78zx7q8187bm8o9p952s9lqla2acaiqdaz4b05wx0ma012od1j5q1zqm2gge2xb03eb63vg84cq24u3g5bjj5t0r6ahq6rx4799f7qhu87l88ojm95ch9m0ka2k1aj0bazdz066t0mjm12y81jfb200g2gpx2xks3ekp3vq14czn4ud95bt65tai6are6s6s79j37qrf87uw8ot595m59ma3a2tqaj9uazno05cd0lpc123s1il11z602fvo2wqd3dqi3uvm4c5h4tiu5az05sg369x76rcc78ot7pwz870l8nyr94ru9lfra1ziaifmaytj05m70lz912do1iuy1zfv2g5i2x053e063v594cf04tsf5b8d5spn6a6i6rlx78y47q6l879y8o8e951a9lpha292aipgaz37' +
+            '05w50m9012nn1j4p1zpt2gf82xa13e9v3vf34con4u265bi25szb6ag96rvk797z7qg987jv8oi295b69lz2a2iuaiyyazcx065l0mip12x31jef1zzc2gp12xjm3ejq3voq4cyl4ubv5bs05t926aq66s5e79hu7qq487to8ory95ky9m8ya2slaj8sazmn05bf0loe122x1ik61z582fuu2wpl3dpl3uus4c4e4thw5axp5sez69vr6rb678nc7pvr86z58nxj94qg9lela1y6aieiaysb05l70ly312cq1itw1zf22g4l2wzf3dzd3v4k4ce84trn5b7l5soo6a5o6rkt78x87q5e87918o76950d9loaa284aio8az2805uv0m7z12mc1j3p1zoj2ge92x8t3e8z3vdz4cnt4u155bh85syc6afc6rum796y7qfb87is8oh695a39ly8a2huaiy5azbx064s0mho12w91jdd1zyg2gnx2xiq3eim3vnw4cxi4ub35bqz5t8b6ap56s4k79gs7qp587sk8oqv95jt9m7ua2rhaj7pazlk05ac0lnb121v1ij31z452ftq2woh3doi3utm4c3f4tgs5aww5sdz69v36ra978mq7puv86yh8nwl94po9ldka1xbaidfayre05k20lx612bl1isy1zdu2g3j2wy43dy73v374ccy4tqb5b6a5sni6a4f6rjt78w37q4j877y8o6e94z99lnga26zaincaz1205ty0m6s12lf1j2i1znn2gd22x7w3e7q3vcy4cmi4u015bfw5sx76ae46rth795v7qe887ht8og395969lx4a2guaiwxazat063g0mgh12uu1jc41zx02gmo2xha3ehe3vme' +
+            '4cw94u9k5bpq5t6t6any6s3579fo7qnx87rk8opu95ix9m6xa2qmaj6sazkm059b0lm9120n1ihv1z2s2fsd2wn13dn13us64c1u4tfb5av85sci69tc6r8s78kz7pth86wv8nvc94o99lcha1w2aicgayq705j40lvy12aj1irl1zco2g222wwu3dwo3v1u4cbf4tow5b4t5sm06a306ri978up7q2y876m8o4u94y29lm0a25waim0az0205sp0m5s12k31j1d1zm52gbr2x683e693vb54cky4ty65bea5sve6aci6rrt79497qco87g98oen957o9lvta2fhaivsaz9l062f0mfc12tu1jaz1zvy2gle2xg33efw3vl14cuk4u825bnw5t586am36s1k79du7qmb87ps8oo895h89m5ca2ozaj5aazj3057x0lku11zf1igk1z1m2fr42wlt3dlq3uqt4c0h4tdt5att5sav69rx6r7378jm7prt86vj8ntr94mz9laxa1usaiawayoy05hl0lup12921iqe1zb72g0v2wvc3dve3v0b4ca14tna5b385skc6a196rgl78sw7q1d874v8o3d94wd9lkna24aaikqayyi05rg0m4b12iw1izy1zl02gad2x543e4w3va24cjk4tx25bcu5su46aaz6rqd792o7qb387eo8od195659lu7a2dzaiu8az85060w0mdw12sc1j9j1zug2gk02xel3eek3vjk4ctc4u6m5bmq5t3s6akw6s0379cm7qku87oi8omr95fx9m3xa2npaj3wazhv056k0ljm11y11ifb1z062fps2wkd3dkd3upd4bz14tcf5asb5s9k69qe6r5t78i27pqj86ty' +
+            '8nsg94ld9l9la1t6ai9laynd05gc0lt7127u1iox1za12fzg2wu73du03uz64c8o4tm45b1z5sj76a056rfg78rv7q07873v8o2594vc9ljba235aijaayxa05py0m3012hc1iym1zjg2g922x3k3e3l3v8i4cia4tvi5bbm5ssp6a9t6rp3791m7qa087dp8oc395579ltba2d1aitaaz7405zv0mcs12r71j8c1zt92gir2xde3ed93vie4crz4u5g5blb5t2o6aji6rz079ba7qju87nc8olu95eu9m32a2mpaj32azgt055o0lii11x11ie31yz42foi2wj83dj23uo74bxt4tb85ar75s8d69pf6r4o78h77ppg86t78nrh94kq9l8qa1snai8saymv05fi0lsm126w1io61z8x2fyi2wsw3dsw3uxr4c7h4tkp5b0q5shu69yv6re778qm7pz3872p8o1794ua9lika22aaiipaywk05ph0m2d12gx1ixy1zix2g892x2w3e2m3v7p4ch44tul5bad5sro6a8k6ro2790f7q8x87cj8ob095449ls9a2c0aisbaz6705z00mbz12qg1j7l1zsi2ghz2xcj3ecf3vhe4cr14u4a5bkb5t1d6aii6rxq79ac7qin87mf8okq95dz9m20a2lvaj21azg1054p0lhs11w41idf1yy82fnu2wic3dib3un84bww4ta55aq15s7669o26r3g78fr7poa86rs8nqd94jd9l7oa1rcai7sayll05ej0lre12601in11z832fxg2ws63drw3ux14c6h4tjw5azo5sgw69xq6rd378pg7pxv871j8nzx94t59lh9a215aiheayve05o30m1412fh' +
+            '1iwo1zhg2g6z2x1g3e1e3v6a4cg04tt75b9a5sqb6a7g6rmo78z87q7k87ba8o9o952w9lr1a2avair5az5305xu0mau12p81j6d1zr72ggo2xb73eb23vg24cpn4u315biw5t076ah26rwj798t7qhc87kt8ojd95cc9m0ma2k9aj0oazeh053e0lg911uv1ibv1ywx2fm92wgy3dgp3uls4bvb4t8p5aom5s5s69ms6r2378el7pmw86qn8nox94i69l66a1q2ai68ayka05cy0lq3124f1ilp1z6g2fw12wqf3dqe3uv64c4v4ti05ay15sf369w56rbg78ny7pwf87038nyl94rq9lfya1zpaig2ayty05ms0lzo12e61iv81zg52g5j2x043dzv3v4w4ceb4trr5b7i5sot6a5o6rl778xj7q65879r8o8b951f9lpoa29daipqaz3j05wc0m9712no1j4p1zpm2gf02x9l3e9f3vef4co04u1b5bhb5sye6afi6rus797e7qfq87jk8ohw95b89lzaa2j8aizeazdf05220lf411td1iam1yvb2fkv2wf93df83uk24btr4t6z5amx5s4169kz6r0d78cq7pl986ou8nng94gj9l4wa1omai54ayiy05bw0lor123b1ikb1z5a2fuk2wp63dot3utw4c394tgp5awg5sdq69ul6ra178me7puw86yl8nx294qb9leia1yeaieqaysq05li0lyi12cw1iu11zet2g482wyn3dyh3v3b4ccx4tq35b645sn66a4b6rjl78w87q4m878g8o6v95069loaa287aiohaz2i05v70m8912mm1j3t1zol2ge22x8h3e8c3vd74cmr4u015bfw' +
+            '5sx46ae06rti795u7qeh87i08ogn959p9ly1a2hqaiy6azbz050x0ldr11sd1i9d1yue2fjp2wee3de33uj64bsl4t5z5alr5s2y69jv6qz878bp7pk486nw8nma94fl9l3pa1noai3wayhz05ao0lnr12231ijb1z422ftl2wny3dnv3usn4c2b4tff5avf5sce69th6r8q78l97ptp86xh8nvz94p99ldia1xeaidsayrr05kk0lxj12by1it11zdv2g392wxr3dxh3v2g4cbw4tpa5b515smc6a366rip78v17q3n87788o5u94yy9lnaa271ainhaz1b05u80m7312lm1j2l1znj2gcu2x7f3e753vc54clo4tz05bey5sw36ad66rsh79527qdf87h98ofl958x9lwza2gyaix5azb804zv0lcz11ra1i8j1yt82fis2wd53dd33uhv4bri4t4o5ako5s1q69ir6qy478ak7pj286mp8nla94ee9l2pa1mgai2waygr059o0lml12141ii61z342fsf2wn03dmo3urp4c124teh5au75sbh69sc6r7u78k87pst86wi8nv294oa9lcja1wdaicpayqm05je0lwb12aq1irr1zcl2g1y2wwf3dw73v124can4tnu5b3u5skw6a226rhd78u27q2g876e8o4t94y79lmca26aaimiaz0j05t60m6612kf1j1l1zm82gbp2x623e5x3var4ckd4txm5bdj5suq6abo6rr6793k7qc887fu8oej957n9lw1a2fraiw9aza204yz0lbr11qa1i771ys52fhd2wbz3dbl3ugn4bq14t3g5aj85s0h69he6qwt789a7phs86ll8nk394df9l1m' +
+            'a1llai1xayfz058q0llr12021ih71z1v2fr92wlk3dlc3uq14bzm4tcp5asp5s9q69qv6r6578is7pr886v38ntm94mz9lb9a1v8aibmaypo05ig0lvh129u1iqy1zbo2g102wvd3dv13uzu4c994tmi5b295sji6a0e6rfy78sd7q12874p8o3f94wk9lkza24qail8ayz305s10m4v12jf1j0d1zla2gai2x523e4n3v9m4ciz4tw95bc35st86aa86rpl79277qan87ej8ocz956e9luka2ekaiutaz8w04xk0lao11oy1i661yqv2fgd2wao3dak3uf94bou4t1w5ahu5rys69ft6qv3787l7pg386jv8nih94bq9l04a1jzai0gayef057b0lk811yq1ifr1z0n2fpx2wkg3dk33up04byc4tbo5arc5s8k69pd6r4u78h67ppt86th8ns594ld9l9sa1tnaia4ayo205gx0ltt128a1ip91za32fzc2wtt3dth3uyd4c7u4tl15b0y5si169z46ree78r27pzg873d8o1t94v89ljea23gaijpayxu05qi0m3l12hv1iz21zjo2g952x3f3e393v804chl4tus5baq5sru6a8t6ro9790o7q9a87cx8obk954p9lt3a2cuaitcaz7704w50l9011nk1i4j1yph2fep2w9a3d8v3udv4bn74t0l5agc5rxm69ei6qtz786f7pez86iq8nha94ak9kysa1ipahz1ayd2055u0liu11x81ieb1yz32fog2wit3dij3una4bwt4t9w5apv5s6v69o06r3b78g07pog86se8nqx94kc9l8ka1skai8vaymx05fn0lsn126y1io21z8r2fy4' +
+            '2wsg3ds73uwz4c6f4tjn5azh5sgo69xm6rd678pn7pye87238o0u94u19liha228aiiqaywj05pg0m2712go1ixk1zig2g7l2x253e1q3v6p4cg34ttf5b985sqg6a7g6rmw78zi7q8187by8oai953y9ls6a2c7aishaz6j04v80l8811mh1i3l1yo82fdm2w7w3d7p3ucd4bly4sz15af15rw069d46qsf78517pdk86hf8ng1949f9kxta1hsahy8ayca05540li311wh1idi1yy82fnh2whu3dhf3um94bvk4t8u5aok5s5t69mo6r2978en7pnd86r38npv94j49l7la1rgai80ayly05ev0lrq12671in41z7x2fx22wrh3dr03uvu4c574tie5ay95sfd69wg6rbu78ok7px287128nzl94t49lhba21faihpayvu05oj0m1n12fv1ix21zhn2g722x1a3e123v5p4cf84tsb5b885sp96a6a6rlo78y87q6v87an8o9d952m9lr2a2axairgaz5c04ua0l7511ln1i2m1yni2fcq2w783d6s3ubp4bkz4sya5ady5rv769c06qrj783y7pcl86gd8nf1948d9kwsa1gqahx7ayb705420lh011vf1icg1yx72fmg2wgt3dgg3ul74bum4t7p5anl5s4k69ln6r0x78dm7pm286q28nol94i49l6ea1qjai6wayl205ds0lqv12541im91z6v2fw82wqf3dq53uuu4c4a4thf5ax95see69vc6rau78na7pw086zp8nyh94rp9lg6a200aiglayug05nf0m0912er1ivn1zgj2g5n2x053dzn3v4l4cdv4tr85b6y5so76a546rkm' +
+            '78x57q5q879k8o85951j9lpta29taiq6az4804t00l6111kd1i1h1ym52fbi2w5s3d5i3ua64bjo4swp5acn5rtm69aq6qq0782o7pb586f28ndn94729kvda1fdahvray9u052n0lfo11u01ib41yvt2fl52wfg3df33uju4bt74t6e5am35s3b69k66qzq78c67pkx86on8nng94gp9l57a1p1ai5layjg05cd0lp5123m1ikh1z5b2fuf2wow3doe3uta4c2l4tfu5avm5scr69tt6r9878lx7pui86yj8nx394qm9leva1yzaif9aytd05m00lz112d81iub1zev2g482wyf3dy63v2t4ccd4tpg5b5f5smf6a3j6riw78vi7q44877z8o6p95029loia28faioxaz2v04rq0l4m11j01hzy1ykp2f9v2w493d3s3u8n4bhy4sv95aax5rs869926qon78137p9t86dl8ncc945o9ku5a1e3ahunay8n051k0lef11sv1i9r1yuh2fjl2wdx3ddf3ui44brg4t4k5ake5s1g69ik6qxx78ao7pj786n98nlu94ff9l3qa1nwai49ayig05b60loa122i1ijm1z452ftg2wnk3dn83urs4c184te85au35sb669s76r7p78ka7pt286ww8nvp94p09ldja1xeaidzayrv05kt0lxn12c41it01zdu2g2x2wxd3dwt3v1o4caw4to65b3u5sl26a1z6rhi78u27q2s876o8o5e94yu9ln8a279ainoaz1q04qi0l3h11ht1hyu1yjj2f8s2w323d2p3u7c4bgr4str5a9n5rqk697o6qmy77zn7p8586c68nat944d9ksqa1cvahtaay7g' +
+            '05080ld911rj1i8n1yt82fij2wcr3dce3uh24bqe4t3i5aj95s0e69h96qws78987pi086ls8nko94dz9l2la1miai35ayh205a20lmu121c1ii51z2y2frz2wmd3dls3uqn4bzv4td45asu5sa169r16r6h78j57prr86vr8nue94ny9lcaa1weaicsayqy05jo0lwq12az1is11zcl2g1w2ww13dvq3v0a4c9t4tmt5b2s5sjs6a0w6rg978sx7q1i875f8o4394xj9llxa25yaimfaz0h04pc0l2b11gp1hxq1yif2f7n2w1y3d1i3u694bfj4ssr5a8g5rpp696k6qm677ym7p7e86b68na0943b9krua1bqahsbay6a04z80lc311qk1i7f1ys72fha2wbn3db33uft4bp34t275ahz5rz169g46qvj788a7pgv86kz8njm94d89l1ka1lqai23ayga058y0lm112071ihb1z1t2fr42wl83dkw3upf4byw4tbv5arr5s8t69pw6r5d78i07pqr86uo8ntj94mx9lbga1veaibyaypv05ir0lvl129z1iqu1zbk2g0n2wv03dug3uza4c8i4tls5b1g5siq69zm6rf878rr7q0j874f8o3994wp9ll7a258ailrayzr04om0l1i11fu1hwr1yhf2f6k2w0s3d0b3u4y4beb4src5a775ro6695a6qkm77xd7p5w869z8n8m94299kqma1auahraay5i04ya0lbe11pm1i6p1yr72fgh2wak3da43ueo4bo04t105ags5rxv69et6qud786w7pfq86jk8nih94bu9l0ha1keai13ayf105810lku11zc1ig51z0w2fpw2wk83djk3uoc' +
+            '4bxg4tao5aqb5s7i69og6r4078go7ppe86tf8ns694lq9la5a1uaaiapayou05hl0lum128w1ipx1zai2fzq2wtv3dth3uy04c7f4tkd5b095sh769yb6rdn78qd7pyy87308o1p94v99ljoa23saik9ayyd04n60l0611eh1hvj1yg52f5e2vzm3cz63u3u4bd44sq85a5w5rn2693w6qjg77vx7p4q868j8n7g940t9kpfa19eahq2ay4004x00l9u11ob1i541ypv2fev2w973d8k3udb4bmh4szm5afb5rwe69de6qss785i7pe486i78ngw94ak9kyya1j7ahzmaydu056l0ljo11xv1iex1yze2fon2wio3dib3ums4bw74t955ap15s6169n56r2k78f87pnx86rw8nqo94k59l8oa1soai98ayn905g50lt1127e1iob1z8z2fy22wsc3drr3uwi4c5p4tiy5ayl5sfv69wr6rce78ow7pxq871l8o0g94tu9lida22caiixayww04lt0kyo11d31htz1yep2f3s2vy13cxh3u254bbe4sog5a485rl8692c6qhp77uh7p3186768n5t93zh9knua182ahogay2o04ve0l8i11mp1i3s1yoa2fdj2w7l3d773ubo4bl14sxz5ads5rut69bu6qrc783z7pct86gr8nfo94949kxra1hpahycayc905570lhy11wd1id51yxu2fmt2wh43dgg3ul84buc4t7l5an85s4h69le6r1178do7pmi86qj8npe94iz9l7ia1rmai84aym705ez0lrw12651in11z7k2fwp2wqt3dqc3uuw4c4a4th95ax55se469va6ran78nf7pw18706' +
+            '8nyx94sk9lh1a219aihqayvw04ko0kxp11bw1hsx1yde2f2l2vwo3cw63u0q4ba14sn35a2t5rjy690w6qgi77t17p1w865r8n4r93y69kmva16vahnmay1m04un0l7h11lx1i2p1yne2fca2w6j3d5s3uag4bjj4swo5aca5rtg69af6qpy782p7pbf86fk8ned94829kwja1gsahxaaybj054b0lhe11vm1icn1yx42fma2wga3dfs3uk74bti4t6d5am85s3669kc6qzr78cj7pl986pd8no794ht9l6ca1qgai70ayl305dy0lqx12591im71z6s2fvx2wq33dpj3uu54c3b4tgf5aw15sd969u46r9r78ma7pv786z38ny394rj9lg7a208aigwayuw04ju0kwo11b41hry1yco2f1p2vvz3cvc3tzz4b954sm65a1v5riu68zv6qf877rz7p0l864r8n3h93x89kloa15zahmgay0q04ti0l6m11kt1i1w1ymc2fbk2w5l3d553u9l4bix4svt5abm5rsk699l6qp1781o7pag86ef8ndd946v9kvja1flahwaayab05390lg411ui1ibb1yvz2fky2wf73dei3uj74bsb4t5i5al45s2d69j96qyw78bh7pkb86oa8nn794gq9l5ba1pfai60ayk305cz0lpv12471il31z5o2fuq2wow3dob3usw4c264tf65av05sc069t56r8i78lb7ptx86y28nwq94qf9leta1z1aifhaytp04ig0kvj119r1hqt1yba2f0j2vuk3cu43tym4b7x4skw5a0n5rhq68yp6qea77qv7ozr863n8n2m93w19kkqa14pahleaxzc04sc0l5511jl' +
+            '1i0c1yl12f9y2w483d3g3u854bh74suc5a9x5rr469826qno780d7p9786dc8nc7945w9kufa1emahv4ay9905210lez11t71ia41yuk2fjo2wdp3dd63uhm4bqx4t3t5ajp5s0n69hu6qx978a47piu86n18nlv94fj9l43a1o9ai4sayiw05bn0lok122r1ijo1z452ft82wna3dmq3ura4c0i4tdl5ata5sah69re6r7378jn7psm86wk8nvm94p49ldua1xvaielaysk04hk0kub118p1hpf1ya22eyy2vt53csd3twz4b624sj559ys5rfv68ww6qcd77p57oxu86218n0u93um9kj4a13hahjzaxya04r20l4511ic1hzc1yjq2f8u2w2r3d273u6i4bfs4ssm5a8f5rpd696h6qlx77yp7p7i86bm8nal94489kswa1d1ahtpay7s050q0ldm11ry1i8s1ytc2fia2wce3dbn3ug74bp84t2b5ahv5rz369fz6qvo788b7pha86lb8nkd94dy9l2na1mrai3fayhh05af0ln9121m1iif1z312frz2wm43dlf3upy4bz44tc25ars5s8r69pu6r5878i27pqq86uz8ntr94nj9lc1a1wdaicvayr504fw0ksz11751ho71y8m2ext2vrs3cra3tvp4b4y4shu59xk5rek68vj6qb177no7owj860j8mzk93t49khva11zahiraxws04pt0l2n11h21hxt1yif2f7b2w1h3d0o3u5a4bea4sre5a6x5ro4694z6qkl77x87p6486a88n97942w9krja1bsahsfay6m04zi0lch11qr1i7m1ys42fh42wb43dah3uew4bo54t105agu' +
+            '5rxr69ey6quc78777pfw86k48nix94co9l17a1lhai20ayg805910lm2120a1ih91z1p2fqt2wks3dk83uoo4bxw4taw5aqk5s7p69oo6r4b78gx7ppv86tu8nsw94md9lb4a1v5aibwaypw04ex0krq11661hmx1y7m2ewi2vqq3cpx3tuj4b3k4sgm59w75rdb68u96q9s77mj7ovc85zj8myd93s59kgoa10zahhiaxvs04ok0l1m11fu1hwt1yh92f6e2w0c3czs3u444bde4sq65a5z5rmw69416qjg77wb7p53869b8n89941z9kqma1atahrfay5j04yd0lba11pi1i6d1yqu2fft2w9w3d973udr4bmu4szx5afj5rwq69dn6qtd78607pf186j28ni794bs9l0ka1koai1eayfe058c0ll411zg1ig61z0q2fpl2wjq3diz3unk4bwo4t9p5apf5s6g69nj6r3078fu7pok86st8nrn94lh9la0a1ueaiaxayp804dz0kr111561hm61y6i2evm2vpi3coy3tta4b2k4sfe59v75rc668t96q8r77li7oud85yh8mxi93r49kfva101ahgtaxuw04nw0l0s11f51hvw1ygf2f592vzc3cyg3u2z4bbx4soz5a4i5rlq692m6qib77v07p4086848n77940w9kpma19uahqkay4p04xn0laj11ov1i5o1yq62ff32w923d8b3ucp4blt4syo5aee5rvd69ci6qry784w7pdn86hz8ngu94ao9kz8a1jlai03ayec05730lk511ya1if91yzn2foq2win3di23umf4bvm4t8i5ao65s5869m76r1t78eh7pnh86ri8nqn94k89l91' +
+            'a1t5ai9xayny04cy0kpr11451hkv1y5i2euc2voi3cnn3ts84b164se759tp5rat68rp6q7877jy7oss85wz8mvy93pr9kefa0ysahffaxtp04mk0kzk11dt1hup1yf42f442vy13cxd3u1o4bav4snn5a3e5rka691e6qgs77tn7p2e866o8n5l93ze9ko2a18eahp0ay3804w30l9211n91i441yoi2fdh2w7f3d6p3ub54bk84sx75act5rtz69aw6qqm78397pca86gb8nfg94909kxua1hyahyraycs055t0lil11x01idp1yya2fn32wh73dgd3ukw4btx4t6y5amk5s3n69kn6r0678cz7plr86q08nov94io9l78a1rlai84ayme';
+
+        const HL = (function () {
+            const TERM_NAME = ['小寒', '大寒', '立春', '雨水', '惊蛰', '春分', '清明', '谷雨', '立夏', '小满', '芒种', '夏至', '小暑', '大暑', '立秋', '处暑', '白露', '秋分', '寒露', '霜降', '立冬', '小雪', '大雪', '冬至'];
+            const MONTH_CN = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+            const NUM_CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
+            const U1900_0131 = Date.UTC(1900, 0, 31);   // 1900 年正月初一
+
+            /* ---- 农历基础 ---- */
+            const leapMonth = y => LUNAR_INFO[y - 1900] & 0xf;
+            const leapDays = y => (leapMonth(y) ? ((LUNAR_INFO[y - 1899] & 0x10000) ? 30 : 29) : 0);
+            const monthDays = (y, m) => ((LUNAR_INFO[y - 1900] & (0x10000 >> m)) ? 30 : 29);
+            function yearDays(y) {
+                let s = 348;
+                for (let i = 0; i < 12; i++) s += (LUNAR_INFO[y - 1900] & (0x8000 >> i)) ? 1 : 0;
+                return s + leapDays(y);
+            }
+
+            function solarToLunar(y, m, d) {
+                let offset = Math.round((Date.UTC(y, m - 1, d) - U1900_0131) / 86400000);
+                let ly = 1900, temp = 0;
+                while (ly < 2101 && offset > 0) { temp = yearDays(ly); offset -= temp; ly++; }
+                if (offset < 0) { offset += temp; ly--; }
+                const leap = leapMonth(ly);
+                let isLeap = false, i = 1;
+                while (i < 13 && offset > 0) {
+                    if (leap > 0 && i === leap + 1 && !isLeap) { i--; isLeap = true; temp = leapDays(ly); }
+                    else { temp = monthDays(ly, i); }
+                    offset -= temp;
+                    if (isLeap && i === leap + 1) isLeap = false;
+                    i++;
+                }
+                if (offset === 0 && leap > 0 && i === leap + 1) {
+                    if (isLeap) isLeap = false; else { isLeap = true; i--; }
+                }
+                if (offset < 0) { offset += temp; i--; }
+                return [ly, isLeap ? -i : i, offset + 1];
+            }
+
+            /* ---- 节气时刻（查表，北京时间） ---- */
+            function termTime(y, n) {
+                if (y < 1900 || y > 2100) return null;      // 数据表边界
+                const mins = parseInt(TERM_STR.substr((y - 1900) * 96 + n * 4, 4), 36);
+                if (!isFinite(mins)) return null;
+                const ts = Date.UTC(y, 0, 1) + mins * 60000;
+                const dt = new Date(ts);
+                return {
+                    y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, day: dt.getUTCDate(),
+                    h: dt.getUTCHours(), mi: dt.getUTCMinutes(), ts: ts
+                };
+            }
+
+            function lunarDayCN(d) {
+                if (d === 10) return '初十';
+                if (d === 20) return '二十';
+                if (d === 30) return '三十';
+                if (d < 10) return '初' + NUM_CN[d];
+                if (d < 20) return '十' + NUM_CN[d - 10];
+                return NUM_CN[Math.floor(d / 10)] + '十' + (d % 10 ? NUM_CN[d % 10] : '');
+            }
+            const pad2 = v => String(v).padStart(2, '0');
+
+            /* ---- 主计算 ---- */
+            function compute(date) {
+                const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
+                const todayTs = Date.UTC(y, m - 1, d);
+
+                // 农历（数据表覆盖 1900-01-31 ~ 2100 年末，越界则只给降级提示）
+                const lunarOK = todayTs >= U1900_0131 && y >= 1900 && y <= 2100;
+                const [ly, lm, ld] = lunarOK ? solarToLunar(y, m, d) : [0, 1, 1];
+
+                // 当前节气 / 下一节气
+                let prev = null, next = null;
+                for (let yy = y - 1; yy <= y + 1; yy++) {
+                    for (let n = 0; n < 24; n++) {
+                        const t = termTime(yy, n);
+                        if (!t) continue;
+                        // 按日粒度判定：交节当天即算进入新节气（与通行日历一致）
+                        if (Date.UTC(t.y, t.m - 1, t.day) <= todayTs) prev = { t, n };
+                        else if (!next) next = { t, n };
+                    }
+                }
+                // 数据表下界（1900 年小寒之前）兜底：按上一年冬至处理
+                if (!prev) { const t = termTime(1900, 0); if (t) prev = { t, n: 23 }; }
+                if (!prev) return { lunarFull: '农历数据支持 1900–2100 年', termText: '—' };
+
+                const isTermDay = prev.t.y === y && prev.t.m === m && prev.t.day === d;
+                const daysToNext = next ? Math.floor((next.t.ts - todayTs) / 86400000) : 0;
+                const termText = next
+                    ? `${isTermDay ? '今日' : ''}${TERM_NAME[prev.n]} · 距<b>${TERM_NAME[next.n]}</b> ${daysToNext}天（${pad2(next.t.m)}-${pad2(next.t.day)} ${pad2(next.t.h)}:${pad2(next.t.mi)}）`
+                    : `${isTermDay ? '今日' : ''}${TERM_NAME[prev.n]}`;
+
+                const lunarText = `${ly}年${lm < 0 ? '闰' : ''}${MONTH_CN[Math.abs(lm) - 1]}月${lunarDayCN(ld)}`;
+
+                return {
+                    lunarFull: lunarOK ? lunarText : '农历数据支持 1900–2100 年',
+                    termText
+                };
+            }
+
+            return { compute };
+        })();
+
+        let lunarDateKey = '';
+        function updateLunar() {
+            const now = new Date();
+            const key = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+            if (key === lunarDateKey) return;   // 同一天内不重复计算
+            lunarDateKey = key;
+
+            const r = HL.compute(now);
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+
+            set('lunar-line', r.lunarFull);
+            set('term-line', r.termText);
+        }
+
+        // 启动时钟（必须放在 HL / updateLunar 定义之后，否则触发暂时性死区报错）
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+
+        // ---------------- 秒表逻辑 ----------------
+        let startTime, updatedTime, difference;
+        let tInterval;
+        let running = false;
+        let countIndex = 0;
+
+        const timerDisplay = document.getElementById('timer');
+        const startBtn = document.getElementById('startBtn');
+        const countBtn = document.getElementById('countBtn');
+        const recordList = document.getElementById('recordList');
+
+        startBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            if (!running) {
+                startTime = new Date().getTime() - (difference || 0);
+                tInterval = setInterval(getShowTime, 10);
+                running = true;
+                startBtn.innerHTML = "停止";
+                startBtn.classList.add('running');
+                countBtn.innerHTML = "计圈";
+            } else {
+                clearInterval(tInterval);
+                running = false;
+                startBtn.innerHTML = "开始";
+                startBtn.classList.remove('running');
+                countBtn.innerHTML = "重置";
+            }
+            createRipple(e.clientX, e.clientY, startBtn);
+        });
+
+        countBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            if (running) {
+                countIndex++;
+                const currentTimeStr = timerDisplay.innerHTML;
+                const li = document.createElement('li');
+                li.className = 'record-item';
+                li.innerHTML = `<span>第 ${countIndex} 次计圈</span> <span>${currentTimeStr}</span>`;
+                recordList.insertBefore(li, recordList.firstChild);
+            } else {
+                clearInterval(tInterval);
+                running = false;
+                difference = 0;
+                countIndex = 0;
+                timerDisplay.innerHTML = "00:00.00";
+                startBtn.innerHTML = "开始";
+                startBtn.classList.remove('running');
+                countBtn.innerHTML = "计圈";
+                recordList.innerHTML = "";
+            }
+            createRipple(e.clientX, e.clientY, countBtn);
+        });
+
+        function getShowTime() {
+            updatedTime = new Date().getTime();
+            difference = updatedTime - startTime;
+            let minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            let seconds = Math.floor((difference % (1000 * 60)) / 1000);
+            let milliseconds = Math.floor((difference % 1000) / 10);
+            minutes = (minutes < 10) ? "0" + minutes : minutes;
+            seconds = (seconds < 10) ? "0" + seconds : seconds;
+            milliseconds = (milliseconds < 10) ? "0" + milliseconds : milliseconds;
+            timerDisplay.innerHTML = minutes + ":" + seconds + "." + milliseconds;
+        }
+
+        // ---------------- 独立计数器逻辑 ----------------
+        let globalCount = 0;
+        const wrapper = document.querySelector('.number-wrapper');
+        const plusBtn = document.getElementById('plusBtn');
+        const minusBtn = document.getElementById('minusBtn');
+        const resetCounterBtn = document.getElementById('resetCounterBtn');
+
+        function updateCounterUI(newVal) {
+            const existingOlds = wrapper.querySelectorAll('.old-num');
+            existingOlds.forEach(el => el.remove());
+
+            const oldSpan = wrapper.querySelector('.current-num');
+            if(oldSpan) {
+                oldSpan.classList.remove('current-num');
+                oldSpan.classList.add('old-num');
+                setTimeout(() => { oldSpan.remove(); }, 400);
+            }
+
+            const newSpan = document.createElement('span');
+            newSpan.textContent = newVal;
+            newSpan.classList.add('num', 'current-num');
+            wrapper.appendChild(newSpan);
+        }
+
+        function handleAction(e, type) {
+            e.preventDefault();
+
+            const clientX = e.clientX;
+            const clientY = e.clientY;
+
+            if (type === 'plus') {
+                globalCount++;
+                updateCounterUI(globalCount);
+                createRipple(clientX, clientY, plusBtn);
+            } else if (type === 'minus') {
+                if (globalCount > 0) {
+                    globalCount--;
+                    updateCounterUI(globalCount);
+                }
+                createRipple(clientX, clientY, minusBtn);
+            } else if (type === 'reset') {
+                globalCount = 0;
+                updateCounterUI(globalCount);
+                createRipple(clientX, clientY, resetCounterBtn);
+            }
+        }
+
+        plusBtn.addEventListener('pointerdown', (e) => handleAction(e, 'plus'));
+        minusBtn.addEventListener('pointerdown', (e) => handleAction(e, 'minus'));
+        resetCounterBtn.addEventListener('pointerdown', (e) => handleAction(e, 'reset'));
+
+        // ---------------- 特效动画 ----------------
+        // 唯一的动画：水波纹扩散
+        function createRipple(clientX, clientY, button) {
+            const circle = document.createElement('span');
+            const diameter = Math.max(button.clientWidth, button.clientHeight);
+            const radius = diameter / 2;
+            circle.style.width = circle.style.height = `${diameter}px`;
+
+            const rect = button.getBoundingClientRect();
+            circle.style.left = `${clientX - rect.left - radius}px`;
+            circle.style.top = `${clientY - rect.top - radius}px`;
+            circle.classList.add('ripple');
+
+            const existingRipple = button.querySelector('.ripple');
+            if (existingRipple) existingRipple.remove();
+            button.appendChild(circle);
+        }
+
+        // ---------------- 单位换算逻辑 ----------------
+        const UNIT_CATEGORIES = {
+            '长度': {
+                units: [
+                    ['毫米', 0.001], ['厘米', 0.01], ['分米', 0.1], ['米', 1],
+                    ['千米', 1000], ['英尺', 0.3048], ['英寸', 0.0254], ['码', 0.9144],
+                    ['英里', 1609.344], ['海里', 1852], ['里', 500], ['尺', 1 / 3], ['寸', 1 / 30]
+                ]
+            },
+            '重量': {
+                units: [
+                    ['毫克', 1e-6], ['克', 0.001], ['千克', 1], ['吨', 1000],
+                    ['磅', 0.45359237], ['盎司', 0.028349523], ['斤', 0.5], ['两', 0.05], ['克拉', 0.0002]
+                ]
+            },
+            '温度': {
+                special: true,
+                units: [['摄氏度', 0], ['华氏度', 0], ['开尔文', 0]]
+            },
+            '面积': {
+                units: [
+                    ['平方厘米', 1e-4], ['平方米', 1], ['平方千米', 1e6], ['公顷', 1e4],
+                    ['亩', 666.6667], ['平方英尺', 0.09290304], ['平方英寸', 0.00064516], ['英亩', 4046.856]
+                ]
+            },
+            '体积': {
+                units: [
+                    ['毫升', 0.001], ['升', 1], ['立方米', 1000], ['立方厘米', 0.001],
+                    ['加仑(美)', 3.78541], ['加仑(英)', 4.54609], ['立方英尺', 28.3168], ['立方英寸', 0.0163871]
+                ]
+            },
+            '速度': {
+                units: [
+                    ['米/秒', 1], ['千米/时', 0.277778], ['英里/时', 0.44704], ['节', 0.514444], ['英尺/秒', 0.3048]
+                ]
+            },
+            '数据存储': {
+                units: [
+                    ['字节(B)', 1], ['千字节(KB)', 1024], ['兆字节(MB)', 1048576],
+                    ['吉字节(GB)', 1073741824], ['太字节(TB)', 1099511627776],
+                    ['比特(bit)', 0.125], ['千比特(Kb)', 128], ['兆比特(Mb)', 131072]
+                ]
+            },
+            '时间': {
+                units: [
+                    ['毫秒', 0.001], ['秒', 1], ['分钟', 60], ['小时', 3600],
+                    ['天', 86400], ['周', 604800], ['月(30天)', 2592000], ['年(365天)', 31536000]
+                ]
+            }
+        };
+
+        const unitCategoryEl = document.getElementById('unitCategory');
+        const unitFromEl = document.getElementById('unitFrom');
+        const unitToEl = document.getElementById('unitTo');
+        const unitFromVal = document.getElementById('unitFromVal');
+        const unitToVal = document.getElementById('unitToVal');
+        const unitSwapBtn = document.getElementById('unitSwap');
+
+        function fillUnitCategory() {
+            unitCategoryEl.innerHTML = '';
+            for (const cat of Object.keys(UNIT_CATEGORIES)) {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                unitCategoryEl.appendChild(opt);
+            }
+        }
+
+        function fillUnitSelects() {
+            const cat = unitCategoryEl.value;
+            const units = UNIT_CATEGORIES[cat].units.map(u => u[0]);
+            [unitFromEl, unitToEl].forEach((sel, i) => {
+                sel.innerHTML = '';
+                units.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u;
+                    opt.textContent = u;
+                    sel.appendChild(opt);
+                });
+                sel.value = i === 0 ? units[0] : units[Math.min(1, units.length - 1)];
+            });
+        }
+
+        function tempToBase(v, unit) {
+            if (unit === '华氏度') return (v - 32) * 5 / 9;
+            if (unit === '开尔文') return v - 273.15;
+            return v;
+        }
+        function tempFromBase(v, unit) {
+            if (unit === '华氏度') return v * 9 / 5 + 32;
+            if (unit === '开尔文') return v + 273.15;
+            return v;
+        }
+
+        function fmtNum(n) {
+            if (isNaN(n) || !isFinite(n)) return '—';
+            if (n === 0) return '0';
+            const abs = Math.abs(n);
+            let s;
+            if (abs >= 1) s = n.toFixed(2);
+            else if (abs >= 0.001) s = n.toFixed(4);
+            else s = n.toFixed(6);
+            return parseFloat(s).toString();
+        }
+
+        function doUnitConvert() {
+            const cat = UNIT_CATEGORIES[unitCategoryEl.value];
+            const from = unitFromEl.value;
+            const to = unitToEl.value;
+            const val = parseFloat(unitFromVal.value);
+            if (isNaN(val)) { unitToVal.value = ''; return; }
+            let result;
+            if (cat.special) {
+                result = tempFromBase(tempToBase(val, from), to);
+            } else {
+                const f = cat.units.find(u => u[0] === from)[1];
+                const t = cat.units.find(u => u[0] === to)[1];
+                result = val * f / t;
+            }
+            unitToVal.value = fmtNum(result);
+        }
+
+        fillUnitCategory();
+        fillUnitSelects();
+        unitCategoryEl.addEventListener('change', () => { fillUnitSelects(); doUnitConvert(); });
+        unitFromEl.addEventListener('change', doUnitConvert);
+        unitToEl.addEventListener('change', doUnitConvert);
+        unitFromVal.addEventListener('input', doUnitConvert);
+        unitSwapBtn.addEventListener('click', () => {
+            const t = unitFromEl.value;
+            unitFromEl.value = unitToEl.value;
+            unitToEl.value = t;
+            doUnitConvert();
+        });
+
+        // ---------------- 汇率换算逻辑 ----------------
+        const RATE_LABELS = {
+            CNY: '人民币', USD: '美元', EUR: '欧元', JPY: '日元', GBP: '英镑',
+            HKD: '港币', TWD: '新台币', KRW: '韩元', AUD: '澳元', CAD: '加元',
+            SGD: '新加坡元', THB: '泰铢', MYR: '林吉特', VND: '越南盾', RUB: '卢布',
+            CHF: '瑞士法郎', INR: '印度卢比', MOP: '澳门元', NZD: '新西兰元',
+            PHP: '菲律宾比索', IDR: '印尼盾'
+        };
+        // 内置离线汇率：1 人民币 = X 外币（仅作后备，联网后会被实时汇率覆盖）
+        const FALLBACK_RATES = {
+            CNY: 1, USD: 0.1408, EUR: 0.1274, JPY: 21.28, GBP: 0.1093,
+            HKD: 1.099, TWD: 4.55, KRW: 192.3, AUD: 0.215, CAD: 0.194,
+            SGD: 0.187, THB: 5.0, MYR: 0.625, VND: 3570, RUB: 12.8,
+            CHF: 0.122, INR: 11.76, MOP: 1.13, NZD: 0.238, PHP: 8.0, IDR: 2222
+        };
+        let RATES = Object.assign({}, FALLBACK_RATES);
+        const RATE_KEYS = Object.keys(RATES);
+
+        const rateFromEl = document.getElementById('rateFrom');
+        const rateToEl = document.getElementById('rateTo');
+        const rateFromVal = document.getElementById('rateFromVal');
+        const rateToVal = document.getElementById('rateToVal');
+        const rateSwapBtn = document.getElementById('rateSwap');
+        const rateNote = document.getElementById('rateNote');
+
+        function fillRateSelects() {
+            [rateFromEl, rateToEl].forEach((sel, i) => {
+                sel.innerHTML = '';
+                RATE_KEYS.forEach(code => {
+                    const opt = document.createElement('option');
+                    opt.value = code;
+                    opt.textContent = `${code} ${RATE_LABELS[code] || ''}`;
+                    sel.appendChild(opt);
+                });
+                sel.value = i === 0 ? 'CNY' : 'USD';
+            });
+        }
+
+        function doRateConvert() {
+            const from = rateFromEl.value;
+            const to = rateToEl.value;
+            const val = parseFloat(rateFromVal.value);
+            if (isNaN(val)) { rateToVal.value = ''; return; }
+            const result = val * RATES[to] / RATES[from];
+            rateToVal.value = fmtNum(result);
+        }
+
+        async function refreshRates() {
+            const apis = [
+                'https://open.er-api.com/v6/latest/CNY',
+                'https://api.exchangerate-api.com/v4/latest/CNY'
+            ];
+            for (const url of apis) {
+                try {
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    const rates = data && data.rates;
+                    if (!rates || typeof rates !== 'object') continue;
+                    let updated = 0;
+                    for (const k of RATE_KEYS) {
+                        if (rates[k] && rates[k] > 0) { RATES[k] = rates[k]; updated++; }
+                    }
+                    if (updated > 0) {
+                        rateNote.textContent = '✅ 汇率已联网更新';
+                        doRateConvert();
+                        return;
+                    }
+                } catch (e) { /* 尝试下一个源 */ }
+            }
+            rateNote.textContent = '📶 离线汇率，仅供参考';
+        }
+
+        fillRateSelects();
+        rateFromEl.addEventListener('change', doRateConvert);
+        rateToEl.addEventListener('change', doRateConvert);
+        rateFromVal.addEventListener('input', doRateConvert);
+        rateSwapBtn.addEventListener('click', () => {
+            const t = rateFromEl.value;
+            rateFromEl.value = rateToEl.value;
+            rateToEl.value = t;
+            doRateConvert();
+        });
+        refreshRates();
+
+        // ---------------- 入场动画收尾 ----------------
+        // 动画播放结束后移除 animation，避免与卡片 hover 的 transform 冲突
+        document.querySelectorAll('.container-card').forEach(card => {
+            card.addEventListener('animationend', (e) => {
+                if (e.target === card) card.classList.add('anim-done');
+            });
+        });
+    </script>
+</body>
+</html>
